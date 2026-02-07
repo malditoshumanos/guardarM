@@ -32,12 +32,13 @@ You can also run `schema.sql` directly.
 
 ```bash
 python app.py \
-  --playlist-url "https://www.youtube.com/playlist?list=PL123" \
+  --playlist-url "https://www.youtube.com/playlist?list=PL123" \ 
   --db-host "localhost" \
   --db-user "root" \
   --db-password "password" \
   --db-name "youtube_audio" \
   --download-dir "downloads"
+  ps. The only required argument is the playlist  
 ```
 
 ## Control Flow (Brief)

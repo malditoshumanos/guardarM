@@ -22,10 +22,10 @@ from downloader import (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download playlist audio with yt-dlp")
     parser.add_argument("--playlist-url", required=True, help="YouTube playlist URL")
-    parser.add_argument("--db-host", required=True)
-    parser.add_argument("--db-user", required=True)
-    parser.add_argument("--db-password", required=True)
-    parser.add_argument("--db-name", required=True)
+    parser.add_argument("--db-host", required=False, default="localhost")
+    parser.add_argument("--db-user", required=False, default="root")
+    parser.add_argument("--db-password", required=False, default="rootpw")
+    parser.add_argument("--db-name", required=False, default="mivida")
     parser.add_argument(
         "--download-dir", default="downloads", help="Directory to store audio files"
     )
@@ -35,12 +35,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
+    # Get playlist ID from URL
     try:
         playlist_id = extract_playlist_id(args.playlist_url)
     except InvalidPlaylistURLError as exc:
         print(f"Invalid playlist URL: {exc}")
         return 1
 
+
+    # Connect to the database
     try:
         connection = get_connection(
             host=args.db_host,
@@ -52,23 +55,29 @@ def main() -> int:
         print(str(exc))
         return 1
 
+
+    # Check if database exists 
     try:
         ensure_schema(connection)
         upsert_playlist(connection, playlist_id, args.playlist_url)
+        # Get already existing videos from the database 
         existing_video_ids = get_existing_video_ids(connection, playlist_id)
     except Exception as exc:
         print(f"Database error: {exc}")
         return 1
 
+
+    # gets the songs in the playlist 
     try:
         entries = fetch_playlist_entries(args.playlist_url)
     except YtDlpError as exc:
         print(f"yt-dlp error: {exc}")
         return 1
-
+    # this returns a list of dics
     normalized_entries = normalize_entries(entries)
     download_dir = Path(args.download_dir)
 
+    # download and log into db 
     for entry in normalized_entries:
         video_id = entry["video_id"]
         if video_id in existing_video_ids:

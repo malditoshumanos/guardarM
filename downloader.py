@@ -30,9 +30,10 @@ def fetch_playlist_entries(playlist_url: str) -> list[dict]:
     cmd = [
         "yt-dlp",
         "--flat-playlist",
-        "-J",
+        "-J", # fetch the playlist in json format
         playlist_url,
     ]
+    # result contains result.returncode, result.stdout, result.stderr
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise YtDlpError(result.stderr.strip() or "yt-dlp failed to read playlist")

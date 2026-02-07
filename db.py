@@ -13,7 +13,7 @@ def get_connection(host: str, user: str, password: str, database: str):
     except Error as exc:
         raise RuntimeError(f"Database connection failed: {exc}") from exc
 
-
+# create tables if they don't exist
 def ensure_schema(connection) -> None:
     cursor = connection.cursor()
     cursor.execute(
@@ -43,7 +43,7 @@ def ensure_schema(connection) -> None:
     connection.commit()
     cursor.close()
 
-
+# get songs already in the database for a given playlist
 def get_existing_video_ids(connection, playlist_id: str) -> set[str]:
     cursor = connection.cursor()
     cursor.execute(
@@ -53,7 +53,6 @@ def get_existing_video_ids(connection, playlist_id: str) -> set[str]:
     rows = cursor.fetchall()
     cursor.close()
     return {row[0] for row in rows}
-
 
 def upsert_playlist(connection, playlist_id: str, playlist_url: str) -> None:
     cursor = connection.cursor()
