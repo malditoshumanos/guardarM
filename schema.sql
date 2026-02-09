@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS playlists (
     id INT AUTO_INCREMENT PRIMARY KEY,
     playlist_id VARCHAR(255) NOT NULL UNIQUE,
     playlist_url TEXT NOT NULL,
+    playlist_title VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -10,9 +10,13 @@ from db import (
     insert_video,
     upsert_playlist,
 )
+
+# Numero mom 318 870 9911
+
 from downloader import (
     InvalidPlaylistURLError,
     YtDlpError,
+    detect_platform,
     download_audio,
     extract_playlist_id,
     fetch_playlist_entries,
@@ -21,8 +25,8 @@ from downloader import (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Download playlist audio with yt-dlp")
-    parser.add_argument("--playlist-url", required=True, help="YouTube playlist URL")
+    parser = argparse.ArgumentParser(description="Download playlist audio with yt-dlp (YouTube and SoundCloud)")
+    parser.add_argument("--playlist-url", required=True, help="YouTube or SoundCloud playlist URL")
     parser.add_argument("--db-host", required=False, default="localhost")
     parser.add_argument("--db-user", required=False, default="root")
     parser.add_argument("--db-password", required=False, default="rootpwd")
@@ -44,6 +48,15 @@ def main() -> int:
     
     args = parse_args()
     logger.info(f"Starting playlist download: {args.playlist_url}")
+
+    # Detect platform (YouTube or SoundCloud)
+    try:
+        logger.info("Detecting platform...")
+        platform = detect_platform(args.playlist_url)
+        logger.info(f"Platform detected: {platform}")
+    except InvalidPlaylistURLError as exc:
+        logger.error(f"Invalid playlist URL: {exc}")
+        return 1
 
     # Get playlist ID from URL
     try:
@@ -74,12 +87,6 @@ def main() -> int:
     try:
         logger.info("Ensuring database schema...")
         ensure_schema(connection)
-        logger.info("Upserting playlist to database...")
-        upsert_playlist(connection, playlist_id, args.playlist_url)
-        # Get already existing videos from the database 
-        logger.info("Retrieving existing videos from database...")
-        existing_video_ids = get_existing_video_ids(connection, playlist_id)
-        logger.info(f"Found {len(existing_video_ids)} existing videos in database")
     except Exception as exc:
         logger.error(f"Database error: {exc}")
         return 1
@@ -88,17 +95,29 @@ def main() -> int:
     # gets the songs in the playlist 
     try:
         logger.info("Fetching playlist entries...")
-        playlist_data = fetch_playlist_entries(args.playlist_url)
+        playlist_data = fetch_playlist_entries(args.playlist_url, platform=platform)
     except YtDlpError as exc:
         logger.error(f"yt-dlp error: {exc}")
         return 1
     # this returns a list of dics
     entries = playlist_data.get("entries", [])
-    normalized_entries = normalize_entries(entries)
+    normalized_entries = normalize_entries(entries, platform=platform)
     logger.info(f"Total entries found in playlist: {len(normalized_entries)}")
     
-    # Get playlist title and create playlist-specific directory
-    playlist_title = playlist_data.get("title") or playlist_id
+    # Get playlist title and upsert to database
+    try:
+        playlist_title = playlist_data.get("title") or playlist_id
+        logger.info(f"Upserting playlist to database with title: {playlist_title}")
+        upsert_playlist(connection, playlist_id, args.playlist_url, playlist_title=playlist_title)
+        # Get already existing videos from the database 
+        logger.info("Retrieving existing videos from database...")
+        existing_video_ids = get_existing_video_ids(connection, playlist_id)
+        logger.info(f"Found {len(existing_video_ids)} existing videos in database")
+    except Exception as exc:
+        logger.error(f"Database error: {exc}")
+        return 1
+    
+    # Create playlist-specific directory
     logger.info(f"Playlist title: {playlist_title}")
     base_download_dir = Path(args.download_dir)
     logger.info(f"Creating base directory: {base_download_dir}")
@@ -126,7 +145,7 @@ def main() -> int:
         logger.info(f"Downloading: {title} ({video_id})")
         
         try:
-            file_path = download_audio(video_url, download_dir, video_title=title, uploader=uploader)
+            file_path = download_audio(video_url, download_dir, video_title=title, uploader=uploader, video_id=video_id, platform=platform)
             logger.info(f"Successfully downloaded to: {file_path}")
         except YtDlpError as exc:
             logger.error(f"Failed to download {video_id}: {exc}")

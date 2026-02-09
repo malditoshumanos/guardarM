@@ -22,6 +22,7 @@ def ensure_schema(connection) -> None:
             id INT AUTO_INCREMENT PRIMARY KEY,
             playlist_id VARCHAR(255) NOT NULL UNIQUE,
             playlist_url TEXT NOT NULL,
+            playlist_title VARCHAR(255),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -54,15 +55,16 @@ def get_existing_video_ids(connection, playlist_id: str) -> set[str]:
     cursor.close()
     return {row[0] for row in rows}
 
-def upsert_playlist(connection, playlist_id: str, playlist_url: str) -> None:
+# upsert means update or insert 
+def upsert_playlist(connection, playlist_id: str, playlist_url: str, playlist_title: str = None) -> None:
     cursor = connection.cursor()
     cursor.execute(
         """
-        INSERT INTO playlists (playlist_id, playlist_url)
-        VALUES (%s, %s)
-        ON DUPLICATE KEY UPDATE playlist_url = VALUES(playlist_url)
+        INSERT INTO playlists (playlist_id, playlist_url, playlist_title)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE playlist_url = VALUES(playlist_url), playlist_title = VALUES(playlist_title)
         """,
-        (playlist_id, playlist_url),
+        (playlist_id, playlist_url, playlist_title),
     )
     connection.commit()
     cursor.close()
